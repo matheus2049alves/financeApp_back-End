@@ -25,7 +25,7 @@ class UsersControllers {
     }
     
     await knex("Users").insert({
-      username: name,
+      name,
       email,
       password: hashPassword
     });
