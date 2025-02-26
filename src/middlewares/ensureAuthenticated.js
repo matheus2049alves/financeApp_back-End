@@ -22,3 +22,5 @@ function ensureAuthenticated(request, response, next) {
     throw new AppError("Invalid JWT token", 401);
   }
 }
+
+module.exports = ensureAuthenticated;
