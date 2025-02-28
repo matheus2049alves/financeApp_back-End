@@ -10,5 +10,6 @@ walletRoutes.use(ensureAuthenticated);
 walletRoutes.post('/', walletsController.create);
 walletRoutes.get('/', walletsController.index);
 walletRoutes.delete('/:id', walletsController.delete);
+walletRoutes.put('/:id', walletsController.update);
 
 module.exports = walletRoutes;

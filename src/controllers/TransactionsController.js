@@ -5,16 +5,20 @@ class TransactionsController {
 
 
   async create(request, response)  {
-    const  {description, type, category, value, transaction_date} = request.body;
+    const  {description, type, category, value, transaction_date, wallet_id} = request.body;
     const user_id = request.user.id;
-    
+    let transactionId;
 
 
-    if (!description || !type || !category || !value || !transaction_date) {
-        throw new appError("Todos os campos são obrigatórios");
+    if (!type || !category || !value || !transaction_date) {
+        throw new appError("insira os campos obrigatórios");
     }
 
  
+    if (!wallet_id) {
+        throw new appError("A carteira é obrigatória");
+    }
+    
     if (!["income", "expense"].includes(type)) {
         throw new appError("O tipo da transação deve ser 'income' ou 'expense'");
     }
@@ -23,19 +27,36 @@ class TransactionsController {
         throw new appError("O valor da transação deve ser maior que zero");
     }
 
+    // Verificar se a carteira existe e pertence ao usuário
+    const wallet = await knex("wallets").where({ id: wallet_id, user_id }).first();
+    if (!wallet) {
+        throw new appError("A carteira não existe ou não pertence ao usuário");
+    }
+
   
     const formattedDate = new Date(transaction_date);
     if (isNaN(formattedDate.getTime())) {
         throw new appError("Data da transação inválida");
     }
 
-    const [transactionId] = await knex("transactions").insert({
+    await knex.transaction(async (trx) => {
+      // Inserir a transação
+      const [id] = await trx("transactions").insert({
         user_id,
+        wallet_id,
         description,
         type,
         category,
         value,
         transaction_date: formattedDate
+      });
+      transactionId = id;
+      // Atualizar o saldo da carteira
+      if (type === "income") {
+        await trx("wallets").where({ id: wallet_id }).increment("balance", value);
+      } else {
+        await trx("wallets").where({ id: wallet_id }).decrement("balance", value);
+      }
     });
 
     return response.status(201).json({ 
@@ -88,8 +109,11 @@ class TransactionsController {
 
     return response.status(200).json(
         { transactions: formattedTransactions, 
+            
             balance,
-            total_transactions: transactions.length
+            total_transactions: transactions.length,
+            total_income: income[0].total || 0,
+            total_expense: expense[0].total || 0
         }
     );
   }
